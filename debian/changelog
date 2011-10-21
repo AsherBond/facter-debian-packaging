@@ -1,0 +1,29 @@
+pe-facter (1.6.2-1puppet1) lucid; urgency=low
+
+  * Rebase to facter 1.6.2
+
+ -- Michael Stahnke <stahnma@puppetlabs.com>  Mon, 10 Oct 2011 14:32:48 -0700
+
+pe-facter (1.6.0-1puppet1) lucid; urgency=low
+
+  * [9fbc3e9] Updating lintian overrides for facter.
+
+ -- Michael Stahnke <stahnma@puppetlabs.com>  Thu, 16 Jun 2011 16:45:24 -0700
+
+pe-facter (1.5.8-1puppet3) lucid; urgency=low
+
+  * Update packaging tooling
+
+ -- Jacob Helwig <jacob@puppetlabs.com>  Fri, 17 Dec 2010 11:55:56 -0800
+
+pe-facter (1.5.8-1puppet2) lucid; urgency=low
+
+  * [1be25f8] Change Runtime dependency to be pe-libopenssl-ruby1.8
+
+ -- Jacob Helwig <jacob@puppetlabs.com>  Sun, 12 Dec 2010 09:10:09 -0800
+
+pe-facter (1.5.8-1puppet1) lucid; urgency=low
+
+  * [4579189] Start packaging Facter for Puppet Enterprise
+
+ -- Jacob Helwig <jacob@puppetlabs.com>  Sat, 11 Dec 2010 21:41:29 -0800
