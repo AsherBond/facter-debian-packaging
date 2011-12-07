@@ -1,3 +1,9 @@
+facter (1.6.4-1puppetlabs1) hardy lucid maverick natty oneiric unstable lenny sid squeeze wheezy; urgency=low
+
+  * Release facter 1.6.4
+
+ -- Matthaus Litteken <matthaus@puppetlabs.com>  Wed, 7 Dec 2011 13:36:48 -0700
+
 facter (1.6.3-1puppetlabs1) hardy lucid maverick natty oneiric unstable lenny sid squeeze wheezy; urgency=low
 
   * Initial packaging for facter 1.6.3
