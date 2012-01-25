@@ -14,7 +14,13 @@ require 'facter/lsb'
 
 Facter.add(:operatingsystem) do
   confine :kernel => :sunos
-  setcode do "Solaris" end
+  setcode do
+    if FileTest.exists?("/etc/debian_version")
+      "Nexenta"
+    else
+      "Solaris"
+    end
+  end
 end
 
 Facter.add(:operatingsystem) do
@@ -44,8 +50,6 @@ Facter.add(:operatingsystem) do
       else
         "OEL"
       end
-    elsif FileTest.exists?("/etc/arch-release")
-      "Arch"
     elsif FileTest.exists?("/etc/vmware-release")
       "VMWareESX"
     elsif FileTest.exists?("/etc/redhat-release")
@@ -84,7 +88,7 @@ Facter.add(:operatingsystem) do
       "Slackware"
     elsif FileTest.exists?("/etc/alpine-release")
       "Alpine"
-    elsif Facter.value(:lsbdistdescription) =~ /Amazon Linux/
+    elsif FileTest.exists?("/etc/system-release")
       "Amazon"
     end
   end

@@ -1,7 +1,6 @@
-#!/usr/bin/env ruby
+#!/usr/bin/env rspec
 
-require File.expand_path(File.dirname(__FILE__) + '/../../spec_helper')
-
+require 'spec_helper'
 require 'facter/util/collection'
 
 describe Facter::Util::Collection do
@@ -92,6 +91,16 @@ describe Facter::Util::Collection do
         fact.expects(:add)
 
         @coll.add(:myname) {}
+      end
+
+      it "should discard resolutions that throw an exception when added" do
+        lambda {
+          @coll.add('yay') do
+            raise
+            setcode { 'yay' }
+          end
+        }.should_not raise_error
+        @coll.value('yay').should be_nil
       end
     end
   end
