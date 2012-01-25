@@ -1,5 +1,6 @@
-require File.expand_path(File.dirname(__FILE__) + '/../../spec_helper')
+#!/usr/bin/env rspec
 
+require 'spec_helper'
 require 'facter/util/virtual'
 
 describe Facter::Util::Virtual do
@@ -79,7 +80,7 @@ describe Facter::Util::Virtual do
     Facter::Util::Virtual.should_not be_vserver
   end
 
-  fixture_path = File.join(SPECDIR, 'fixtures', 'virtual', 'proc_self_status')
+  fixture_path = fixtures('virtual', 'proc_self_status')
 
   test_cases = [
     [File.join(fixture_path, 'vserver_2_1', 'guest'), true, 'vserver 2.1 guest'],
@@ -146,6 +147,13 @@ describe Facter::Util::Virtual do
     FileTest.stubs(:exists?).with("/proc/cpuinfo").returns(false)
     Facter.fact(:kernel).stubs(:value).returns("FreeBSD")
     Facter::Util::Resolution.stubs(:exec).with("/sbin/sysctl -n hw.model").returns("QEMU Virtual CPU version 0.12.4")
+    Facter::Util::Virtual.should be_kvm
+  end
+
+  it "should detect kvm on OpenBSD" do
+    FileTest.stubs(:exists?).with("/proc/cpuinfo").returns(false)
+    Facter.fact(:kernel).stubs(:value).returns("OpenBSD")
+    Facter::Util::Resolution.stubs(:exec).with("/sbin/sysctl -n hw.model").returns('QEMU Virtual CPU version (cpu64-rhel6) ("AuthenticAMD" 686-class, 512KB L2 cache)')
     Facter::Util::Virtual.should be_kvm
   end
 

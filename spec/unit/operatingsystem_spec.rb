@@ -1,17 +1,11 @@
-#!/usr/bin/env ruby
+#!/usr/bin/env rspec
 
-require File.expand_path(File.dirname(__FILE__) + '/../spec_helper')
-
-require 'facter'
+require 'spec_helper'
 
 describe "Operating System fact" do
 
-  before do
-    Facter.clear
-  end
-
-  after do
-    Facter.clear
+  before :each do
+    FileTest.stubs(:exists?).returns false
   end
 
   it "should default to the kernel name" do
@@ -19,74 +13,112 @@ describe "Operating System fact" do
 
     Facter.fact(:operatingsystem).value.should == "Nutmeg"
   end
-
-  it "should be Solaris for SunOS" do
-     Facter.fact(:kernel).stubs(:value).returns("SunOS")
-
-     Facter.fact(:operatingsystem).value.should == "Solaris"
-  end
-
   it "should be ESXi for VMkernel" do
      Facter.fact(:kernel).stubs(:value).returns("VMkernel")
 
      Facter.fact(:operatingsystem).value.should == "ESXi"
   end
 
-  it "should identify Oracle VM as OVS" do
-    Facter.fact(:kernel).stubs(:value).returns("Linux")
-    Facter.stubs(:value).with(:lsbdistid).returns(nil)
-    FileTest.stubs(:exists?).returns false
+  describe "on Solaris variants" do
+    before :each do
+      Facter.fact(:kernel).stubs(:value).returns("SunOS")
+    end
 
-    FileTest.expects(:exists?).with("/etc/ovs-release").returns true
-    FileTest.expects(:exists?).with("/etc/enterprise-release").returns true
+    it "should be Nexenta if /etc/debian_version is present" do
+      FileTest.expects(:exists?).with("/etc/debian_version").returns true
+      Facter.fact(:operatingsystem).value.should == "Nexenta"
+    end
 
-    Facter.fact(:operatingsystem).value.should == "OVS"
-  end
-   
-  it "should identify VMWare ESX" do
-    Facter.fact(:kernel).stubs(:value).returns("Linux")
-    Facter.stubs(:value).with(:lsbdistid).returns(nil)
-    FileTest.stubs(:exists?).returns false
-
-    FileTest.expects(:exists?).with("/etc/vmware-release").returns true
-
-    Facter.fact(:operatingsystem).value.should == "VMWareESX"
+    it "should be Solaris for SunOS if no other variants match" do
+      Facter.fact(:operatingsystem).value.should == "Solaris"
+    end
   end
 
-  it "should identify Alpine Linux" do
-    Facter.fact(:kernel).stubs(:value).returns("Linux")
-    
-    FileTest.stubs(:exists?).returns false
-    
-    FileTest.expects(:exists?).with("/etc/alpine-release").returns true
+  describe "on Linux" do
+    before :each do
+      Facter.fact(:kernel).stubs(:value).returns("Linux")
+    end
 
-    Facter.fact(:operatingsystem).value.should == "Alpine"
-  end
+    {
+      "Debian"      => "/etc/debian_version",
+      "Gentoo"      => "/etc/gentoo-release",
+      "Fedora"      => "/etc/fedora-release",
+      "Mandriva"    => "/etc/mandriva-release",
+      "Mandrake"    => "/etc/mandrake-release",
+      "MeeGo"       => "/etc/meego-release",
+      "Archlinux"   => "/etc/arch-release",
+      "OracleLinux" => "/etc/oracle-release",
+      "Alpine"      => "/etc/alpine-release",
+      "VMWareESX"   => "/etc/vmware-release",
+      "Bluewhite64" => "/etc/bluewhite64-version",
+      "Slamd64"     => "/etc/slamd64-version",
+      "Slackware"   => "/etc/slackware-version",
+      "Amazon"      => "/etc/system-release",
+    }.each_pair do |distribution, releasefile|
+      it "should be #{distribution} if #{releasefile} exists" do
+        FileTest.expects(:exists?).with(releasefile).returns true
+        Facter.fact(:operatingsystem).value.should == distribution
+      end
+    end
 
-  it "should identify Scientific Linux" do
-    Facter.fact(:kernel).stubs(:value).returns("Linux")
-    FileTest.stubs(:exists?).returns false
+    describe "depending on LSB release information" do
+      before :each do
+        Facter.collection.loader.load(:lsb)
+      end
 
-    FileTest.expects(:exists?).with("/etc/redhat-release").returns true
-    File.expects(:read).with("/etc/redhat-release").returns("Scientific Linux SLC 5.7 (Boron)")
-    Facter.fact(:operatingsystem).value.should == "Scientific"
-  end
+      it "on Ubuntu should use the lsbdistid fact" do
+        FileUtils.stubs(:exists?).with("/etc/debian_version").returns true
 
-  it "should differentiate between Scientific Linux CERN and Scientific Linux" do
-    Facter.fact(:kernel).stubs(:value).returns("Linux")
-    FileTest.stubs(:exists?).returns false
+        Facter.fact(:lsbdistid).expects(:value).returns("Ubuntu")
+        Facter.fact(:operatingsystem).value.should == "Ubuntu"
+      end
 
-    FileTest.expects(:exists?).with("/etc/redhat-release").returns true
-    File.expects(:read).with("/etc/redhat-release").returns("Scientific Linux CERN SLC 5.7 (Boron)")
-    Facter.fact(:operatingsystem).value.should == "SLC"
-  end
+    end
 
-  it "should identify Ascendos Linux" do
-    Facter.fact(:kernel).stubs(:value).returns("Linux")
-    FileTest.stubs(:exists?).returns false
 
-    FileTest.expects(:exists?).with("/etc/redhat-release").returns true
-    File.expects(:read).with("/etc/redhat-release").returns("Ascendos release 6.0 (Nameless)")
-    Facter.fact(:operatingsystem).value.should == "Ascendos"
+    # Check distributions that rely on the contents of /etc/redhat-release
+    {
+      "RedHat"     => "Red Hat Enterprise Linux Server release 6.0 (Santiago)",
+      "CentOS"     => "CentOS release 5.6 (Final)",
+      "Scientific" => "Scientific Linux release 6.0 (Carbon)",
+      "SLC"        => "Scientific Linux CERN SLC release 5.7 (Boron)",
+      "Ascendos"   => "Ascendos release 6.0 (Nameless)",
+      "CloudLinux" => "CloudLinux Server release 5.5",
+    }.each_pair do |operatingsystem, string|
+      it "should be #{operatingsystem} based on /etc/redhat-release contents #{string}" do
+        FileTest.expects(:exists?).with("/etc/redhat-release").returns true
+        File.expects(:read).with("/etc/redhat-release").returns string
+
+        Facter.fact(:operatingsystem).value.should == operatingsystem
+      end
+    end
+
+    describe "Oracle variant" do
+      it "should be OVS if /etc/ovs-release exists" do
+        Facter.stubs(:value).with(:lsbdistid)
+        FileTest.expects(:exists?).with("/etc/enterprise-release").returns true
+        FileTest.expects(:exists?).with("/etc/ovs-release").returns true
+        Facter.fact(:operatingsystem).value.should == "OVS"
+      end
+
+      it "should be OEL if /etc/ovs-release doesn't exist" do
+        FileTest.expects(:exists?).with("/etc/enterprise-release").returns true
+        FileTest.expects(:exists?).with("/etc/ovs-release").returns false
+        Facter.fact(:operatingsystem).value.should == "OEL"
+      end
+    end
+
+    it "should identify VMWare ESX" do
+      Facter.stubs(:value).with(:lsbdistid).returns(nil)
+
+      FileTest.expects(:exists?).with("/etc/vmware-release").returns true
+      Facter.fact(:operatingsystem).value.should == "VMWareESX"
+    end
+
+    it "should differentiate between Scientific Linux CERN and Scientific Linux" do
+      FileTest.expects(:exists?).with("/etc/redhat-release").returns true
+      File.expects(:read).with("/etc/redhat-release").returns("Scientific Linux CERN SLC 5.7 (Boron)")
+      Facter.fact(:operatingsystem).value.should == "SLC"
+    end
   end
 end

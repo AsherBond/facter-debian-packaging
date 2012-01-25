@@ -52,7 +52,7 @@ Facter.add("virtual") do
 
   setcode do
 
-    if Facter.value(:operatingsystem) == "Solaris" and Facter::Util::Virtual.zone?
+    if Facter.value(:kernel) == "SunOS" and Facter::Util::Virtual.zone?
       result = "zone"
     end
 
@@ -123,6 +123,16 @@ Facter.add("virtual") do
           res.timeout = 6
           res.setcode('prtdiag')
           output = res.value
+          if not output.nil?
+            output.each_line do |pd|
+              result = "parallels" if pd =~ /Parallels/
+              result = "vmware" if pd =~ /VMware/
+              result = "virtualbox" if pd =~ /VirtualBox/
+              result = "xenhvm" if pd =~ /HVM domU/
+            end
+          end
+        elsif Facter.value(:kernel) == 'OpenBSD'
+          output = Facter::Util::Resolution.exec('sysctl -n hw.product 2>/dev/null')
           if not output.nil?
             output.each_line do |pd|
               result = "parallels" if pd =~ /Parallels/

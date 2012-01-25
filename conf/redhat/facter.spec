@@ -1,4 +1,4 @@
-%{!?ruby_sitelibdir: %define ruby_sitelibdir %(ruby -rrbconfig -e 'puts Config::CONFIG["sitelibdir"]')}
+%{!?ruby_sitelibdir: %define ruby_sitelibdir %(ruby -rrbconfig -e 'puts Object.const_get(defined?(RbConfig) ? :RbConfig : :Config)::CONFIG["sitelibdir"]'
 
 %define has_ruby_abi 0%{?fedora} || 0%{?rhel} >= 5
 %define has_ruby_noarch %has_ruby_abi
@@ -22,6 +22,7 @@ BuildArch: noarch
 Requires: ruby >= 1.8.1
 Requires: which
 Requires: dmidecode
+Requires: pciutils
 %if %has_ruby_abi
 Requires: ruby(abi) = 1.8
 %endif
