@@ -1,3 +1,9 @@
+facter (1.6.5-1puppetlabs2) lenny lucid squeeze; urgency=low
+
+  * (#12436) Adding pciutils as a dependency.
+
+ -- Matthaus Litteken <matthaus@puppetlabs.com>  Fri, 10 Feb 2012 01:49:22 +0000
+
 facter (1.6.5-1puppetlabs1) hardy lucid maverick natty oneiric unstable lenny sid squeeze wheezy; urgency=low
 
   * Release facter 1.6.5
