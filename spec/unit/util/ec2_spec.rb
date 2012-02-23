@@ -22,6 +22,13 @@ describe Facter::Util::EC2 do
         Facter::Util::EC2.has_ec2_arp?.should == true
       end
 
+      it "should succeed if arp table contains FE:FF:FF:FF:FF:FF" do
+        ec2arp = my_fixture_read("centos-arp-ec2.out")
+        Facter::Util::Resolution.expects(:exec).with("arp -an").\
+          at_least_once.returns(ec2arp)
+        Facter::Util::EC2.has_ec2_arp?.should == true
+      end
+
       it "should fail if arp table does not contain fe:ff:ff:ff:ff:ff" do
         ec2arp = my_fixture_read("linux-arp-not-ec2.out")
         Facter::Util::Resolution.expects(:exec).with("arp -an").
@@ -65,6 +72,22 @@ describe Facter::Util::EC2 do
         at_least_once.returns("0c:1d:a0:bc:aa:02")
 
       Facter::Util::EC2.has_euca_mac?.should == false
+    end
+  end
+
+  describe "is_openstack_mac? method" do
+    it "should return true when the mac is an openstack one" do
+      Facter.expects(:value).with(:macaddress).\
+        at_least_once.returns("02:16:3e:54:89:fd")
+
+      Facter::Util::EC2.has_openstack_mac?.should == true
+    end
+
+    it "should return false when the mac is not a openstack one" do
+      Facter.expects(:value).with(:macaddress).\
+        at_least_once.returns("0c:1d:a0:bc:aa:02")
+
+      Facter::Util::EC2.has_openstack_mac?.should == false
     end
   end
 
