@@ -1,4 +1,4 @@
-facter (1.6.5-1puppetlabs2) lenny lucid squeeze; urgency=low
+facter (1.6.6-1puppetlabs1) hardy lucid maverick natty oneiric unstable lenny sid squeeze wheezy precise; urgency=low
 
   * (#12436) Adding pciutils as a dependency.
 
