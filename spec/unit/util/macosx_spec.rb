@@ -4,15 +4,46 @@ require 'spec_helper'
 require 'facter/util/macosx'
 
 describe Facter::Util::Macosx do
+  let(:badplist) do
+    '<?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC -//Apple Computer//DTD PLIST 1.0//EN http://www.apple.com/DTDs/PropertyList-1.0.dtd>
+    <plist version="1.0">
+      <dict>
+          <key>test</key>
+              <string>file</string>
+                </dict>
+                </plist>'
+  end
+
+  let(:goodplist) do
+    '<?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>test</key>
+        <string>file</string>
+        </dict>
+        </plist>'
+  end
+
   it "should be able to retrieve profiler data as xml for a given data field" do
     Facter::Util::Resolution.expects(:exec).with("/usr/sbin/system_profiler -xml foo").returns "yay"
     Facter::Util::Macosx.profiler_xml("foo").should == "yay"
   end
 
-  it "should use PList to convert xml to data structures" do
-    Plist.expects(:parse_xml).with("foo").returns "bar"
+  it 'should correct a bad XML doctype string' do
+    Facter.expects(:debug).with('Had to fix plist with incorrect DOCTYPE declaration')
+    Facter::Util::Macosx.intern_xml(badplist)
+  end
 
-    Facter::Util::Macosx.intern_xml("foo").should == "bar"
+  it 'should return a hash given XML data' do
+    test_hash = { 'test' => 'file' }
+    Facter::Util::Macosx.intern_xml(goodplist).should == test_hash
+  end
+
+  it 'should fail when trying to read invalid XML' do
+    expect { Facter::Util::Macosx.intern_xml('<bad}|%-->xml<--->') }.should \
+      raise_error(RuntimeError, /A plist file could not be properly read by Facter::Util::CFPropertyList/)
   end
 
   describe "when collecting profiler data" do
@@ -43,19 +74,19 @@ describe Facter::Util::Macosx do
     Facter::Util::Macosx.expects(:profiler_data).with("SPSoftwareDataType").returns "eh"
     Facter::Util::Macosx.os_overview.should == "eh"
   end
-  
+
   describe "when working out software version" do
-    
+
     before do
       Facter::Util::Resolution.expects(:exec).with("/usr/bin/sw_vers -productName").returns "Mac OS X"
       Facter::Util::Resolution.expects(:exec).with("/usr/bin/sw_vers -buildVersion").returns "9J62"
     end
-    
+
     it "should have called sw_vers three times when determining software version" do
       Facter::Util::Resolution.expects(:exec).with("/usr/bin/sw_vers -productVersion").returns "10.5.7"
       Facter::Util::Macosx.sw_vers
     end
-  
+
     it "should return a hash with the correct keys when determining software version" do
       Facter::Util::Resolution.expects(:exec).with("/usr/bin/sw_vers -productVersion").returns "10.5.7"
       Facter::Util::Macosx.sw_vers.keys.sort.should == ["macosx_productName",
@@ -64,14 +95,14 @@ describe Facter::Util::Macosx do
                                                         "macosx_productversion_major",
                                                         "macosx_productVersion"].sort
     end
-  
+
     it "should split a product version of 'x.y.z' into separate hash entries correctly" do
       Facter::Util::Resolution.expects(:exec).with("/usr/bin/sw_vers -productVersion").returns "1.2.3"
       sw_vers = Facter::Util::Macosx.sw_vers
       sw_vers["macosx_productversion_major"].should == "1.2"
       sw_vers["macosx_productversion_minor"].should == "3"
     end
-  
+
     it "should treat a product version of 'x.y' as 'x.y.0" do
       Facter::Util::Resolution.expects(:exec).with("/usr/bin/sw_vers -productVersion").returns "2.3"
       Facter::Util::Macosx.sw_vers["macosx_productversion_minor"].should == "0"

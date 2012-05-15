@@ -10,6 +10,7 @@
 #   information.
 #   On Slackware, parses '/etc/slackware-version'.
 #   On Amazon Linux, returns the 'lsbdistrelease' value.
+#   On Mageia, parses '/etc/mageia-release' for the release version.
 #
 #   On all remaining systems, returns the 'kernelrelease' value.
 #
@@ -92,6 +93,16 @@ Facter.add(:operatingsystemrelease) do
 end
 
 Facter.add(:operatingsystemrelease) do
+  confine :operatingsystem => %w{Mageia}
+  setcode do
+    release = Facter::Util::Resolution.exec('cat /etc/mageia-release')
+    if release =~ /Mageia release ([0-9.]+)/
+      $1
+    end
+  end
+end
+
+Facter.add(:operatingsystemrelease) do
   confine :operatingsystem => %w{Bluewhite64}
   setcode do
     releasefile = Facter::Util::Resolution.exec('cat /etc/bluewhite64-version')
@@ -135,6 +146,16 @@ end
 Facter.add(:operatingsystemrelease) do
   confine :operatingsystem => %W{Amazon}
   setcode do Facter[:lsbdistrelease].value end
+end
+
+Facter.add(:operatingsystemrelease) do
+  confine :operatingsystem => :solaris
+  setcode do
+    release = File.open('/etc/release','r') {|f| f.readline.chomp}
+    if match = /\s+s(\d+)[sx]?(_u\d+)?.*(?:SPARC|X86)/.match(release)
+      match.captures.join('')
+    end
+  end
 end
 
 Facter.add(:operatingsystemrelease) do

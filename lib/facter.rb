@@ -25,7 +25,8 @@ module Facter
   include Comparable
   include Enumerable
 
-  FACTERVERSION = '1.6.8'
+  FACTERVERSION = '2.0.0'
+
   # = Facter
   # Functions as a hash of 'facts' you might care about about your
   # system, such as mac address, IP address, Video card, etc.
@@ -39,15 +40,12 @@ module Facter
   # puts Facter['operatingsystem']
   #
 
-  # Set LANG to force i18n to C
-  #
-  ENV['LANG'] = 'C'
-
   GREEN = "[0;32m"
   RESET = "[0m"
   @@debug = 0
   @@timing = 0
   @@messages = {}
+  @@debug_messages = {}
 
   # module methods
 
@@ -72,6 +70,14 @@ module Facter
       puts GREEN + string + RESET
     end
   end
+
+  # Debug once.
+  def self.debugonce(msg)
+    if msg and not msg.empty? and @@debug_messages[msg].nil?
+      @@debug_messages[msg] = true
+      debug(msg) 
+    end 
+  end 
 
   def self.debugging?
     @@debug != 0

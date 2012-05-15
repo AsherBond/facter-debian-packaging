@@ -23,14 +23,24 @@ Facter.add(:domain) do
     # Get the domain from various sources; the order of these
     # steps is important
 
-    if name = Facter::Util::Resolution.exec('hostname') \
+    # In some OS 'hostname -f' will change the hostname to '-f' 
+    # We know that Solaris and HP-UX exhibit this behavior 
+    # On good OS, 'hostname -f' will return the FQDN which is preferable 
+    # Due to dangerous behavior of 'hostname -f' on old OS, we will explicitly opt-in 
+    # 'hostname -f' --hkenney May 9, 2012
+    hostname_command = 'hostname'
+    can_do_hostname_f = Regexp.union /Linux/i, /FreeBSD/i, /Darwin/i
+    hostname_command = 'hostname -f' if Facter.value(:kernel) =~ can_do_hostname_f
+
+       
+    if name = Facter::Util::Resolution.exec(hostname_command) \
       and name =~ /.*?\.(.+$)/
 
-      $1
+      return_value = $1
     elsif domain = Facter::Util::Resolution.exec('dnsdomainname') \
-      and domain =~ /.+\..+/
+      and domain =~ /.+/
 
-      domain
+      return_value = domain
     elsif FileTest.exists?("/etc/resolv.conf")
       domain = nil
       search = nil
@@ -43,21 +53,28 @@ Facter.add(:domain) do
           end
         }
       }
-      next domain if domain
-      next search if search
+      return_value ||= domain
+      return_value ||= search
     end
+    return_value = '' if return_value.nil?
+    return_value.gsub(/\.$/, '')
   end
 end
 
 Facter.add(:domain) do
   confine :kernel => :windows
   setcode do
-    require 'facter/util/wmi'
+    require 'facter/util/registry'
     domain = ""
-    Facter::Util::WMI.execquery("select DNSDomain from Win32_NetworkAdapterConfiguration where IPEnabled = True").each { |nic|
-      domain = nic.DNSDomain
-      break
-    }
-    domain
+    regvalue = Facter::Util::Registry.hklm_read('SYSTEM\CurrentControlSet\Services\Tcpip\Parameters', 'Domain')
+    domain = regvalue if regvalue
+    if domain == ""
+      require 'facter/util/wmi'
+      Facter::Util::WMI.execquery("select DNSDomain from Win32_NetworkAdapterConfiguration where IPEnabled = True").each { |nic|
+        domain = nic.DNSDomain
+        break
+      }
+    end
+    domain.gsub(/\.$/, '')
   end
 end

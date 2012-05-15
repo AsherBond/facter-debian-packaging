@@ -12,6 +12,12 @@ describe Facter::Util::Resolution do
     Facter::Util::Resolution.new("yay").name.should == "yay"
   end
 
+  it "should be able to set the value" do
+    resolve = Facter::Util::Resolution.new("yay")
+    resolve.value = "foo"
+    resolve.value.should == "foo"
+  end
+
   it "should have a method for setting the weight" do
     Facter::Util::Resolution.new("yay").should respond_to(:has_weight)
   end
@@ -41,6 +47,66 @@ describe Facter::Util::Resolution do
     res = Facter::Util::Resolution.new("yay")
     res.timeout = "testing"
     res.limit.should == "testing"
+  end
+
+
+  describe "when overriding environment variables" do
+    it "should execute the caller's block with the specified env vars" do
+      test_env = { "LANG" => "C", "FOO" => "BAR" }
+      Facter::Util::Resolution.with_env test_env do
+        test_env.keys.each do |key|
+          ENV[key].should == test_env[key]
+        end
+      end
+    end
+
+    it "should restore pre-existing environment variables to their previous values" do
+      orig_env = {}
+      new_env = {}
+      # an arbitrary sentinel value to use to temporarily set the environment vars to
+      sentinel_value = "Abracadabra"
+
+      # grab some values from the existing ENV (arbitrarily choosing 3 here)
+      ENV.keys.first(3).each do |key|
+        # save the original values so that we can test against them later
+        orig_env[key] = ENV[key]
+        # create bogus temp values for the chosen keys
+        new_env[key] = sentinel_value
+      end
+
+      # verify that, during the 'with_env', the new values are used
+      Facter::Util::Resolution.with_env new_env do
+        orig_env.keys.each do |key|
+          ENV[key].should == new_env[key]
+        end
+      end
+
+      # verify that, after the 'with_env', the old values are restored
+      orig_env.keys.each do |key|
+        ENV[key].should == orig_env[key]
+      end
+    end
+
+    it "should not be affected by a 'return' statement in the yield block" do
+      @sentinel_var = :resolution_test_foo.to_s
+
+      # the intent of this test case is to test a yield block that contains a return statement.  However, it's illegal
+      # to use a return statement outside of a method, so we need to create one here to give scope to the 'return'
+      def handy_method()
+        ENV[@sentinel_var] = "foo"
+        new_env = { @sentinel_var => "bar" }
+
+        Facter::Util::Resolution.with_env new_env do
+          ENV[@sentinel_var].should == "bar"
+          return
+        end
+      end
+
+      handy_method()
+
+      ENV[@sentinel_var].should == "foo"
+
+    end
   end
 
   describe "when setting the code" do
@@ -96,6 +162,116 @@ describe Facter::Util::Resolution do
       @resolve = Facter::Util::Resolution.new("yay")
     end
 
+    it "should return any value that has been provided" do
+      @resolve.value = "foo"
+      @resolve.value.should == "foo"
+    end
+
+    describe "when dealing with whitespace" do
+      it "should by default strip whitespace" do 
+        @resolve.setcode {'  value  '}
+        @resolve.value.should == 'value' 
+      end 
+      
+      it "should strip whitespace from frozen strings" do
+        result = '  val  ue  ' 
+        result.freeze 
+        @resolve.setcode{result}
+        @resolve.value.should == 'val  ue'
+      end 
+
+      describe "when given a string" do
+        [true, false
+        ].each do |windows| 
+          describe "#{ (windows) ? '' : 'not' } on Windows" do
+            before do
+              Facter::Util::Config.stubs(:is_windows?).returns(windows)
+            end
+
+            describe "stripping whitespace" do
+              [{:name => 'leading', :result => '  value', :expect => 'value'},
+               {:name => 'trailing', :result => 'value  ', :expect => 'value'}, 
+               {:name => 'internal', :result => 'val  ue', :expect => 'val  ue'},
+               {:name => 'leading and trailing', :result => '  value  ', :expect => 'value'},  
+               {:name => 'leading and internal', :result => '  val  ue', :expect => 'val  ue'}, 
+               {:name => 'trailing and internal', :result => 'val  ue  ', :expect => 'val  ue'}
+              ].each do |scenario|
+
+                it "should remove outer whitespace when whitespace is #{scenario[:name]}" do 
+                  @resolve.setcode "/bin/foo"
+                  Facter::Util::Resolution.expects(:exec).once.with("/bin/foo").returns scenario[:result]
+                  @resolve.value.should == scenario[:expect] 
+                end 
+
+              end 
+            end 
+
+            describe "not stripping whitespace" do
+              before do
+                @resolve.preserve_whitespace 
+              end 
+
+              [{:name => 'leading', :result => '  value', :expect => '  value'}, 
+               {:name => 'trailing', :result => 'value  ', :expect => 'value  '}, 
+               {:name => 'internal', :result => 'val  ue', :expect => 'val  ue'},
+               {:name => 'leading and trailing', :result => '  value  ', :expect => '  value  '},  
+               {:name => 'leading and internal', :result => '  val  ue', :expect => '  val  ue'}, 
+               {:name => 'trailing and internal', :result => 'val  ue  ', :expect => 'val  ue  '}
+              ].each do |scenario|
+
+                it "should not remove #{scenario[:name]} whitespace" do 
+                  @resolve.setcode "/bin/foo"
+                  Facter::Util::Resolution.expects(:exec).once.with("/bin/foo").returns scenario[:result]
+                  @resolve.value.should == scenario[:expect] 
+                end 
+
+              end 
+            end 
+          end 
+        end 
+      end
+ 
+      describe "when given a block" do
+        describe "stripping whitespace" do 
+          [{:name => 'leading', :result => '  value', :expect => 'value'},
+           {:name => 'trailing', :result => 'value  ', :expect => 'value'}, 
+           {:name => 'internal', :result => 'val  ue', :expect => 'val  ue'},
+           {:name => 'leading and trailing', :result => '  value  ', :expect => 'value'},  
+           {:name => 'leading and internal', :result => '  val  ue', :expect => 'val  ue'}, 
+           {:name => 'trailing and internal', :result => 'val  ue  ', :expect => 'val  ue'}
+          ].each do |scenario|
+
+            it "should remove outer whitespace when whitespace is #{scenario[:name]}" do 
+              @resolve.setcode {scenario[:result]}
+              @resolve.value.should == scenario[:expect] 
+            end
+
+          end 
+        end
+
+        describe "not stripping whitespace" do 
+          before do
+            @resolve.preserve_whitespace 
+          end
+          
+          [{:name => 'leading', :result => '  value', :expect => '  value'}, 
+           {:name => 'trailing', :result => 'value  ', :expect => 'value  '}, 
+           {:name => 'internal', :result => 'val  ue', :expect => 'val  ue'},
+           {:name => 'leading and trailing', :result => '  value  ', :expect => '  value  '},  
+           {:name => 'leading and internal', :result => '  val  ue', :expect => '  val  ue'}, 
+           {:name => 'trailing and internal', :result => 'val  ue  ', :expect => 'val  ue  '}
+          ].each do |scenario|
+
+            it "should not remove #{scenario[:name]} whitespace" do 
+              @resolve.setcode {scenario[:result]}
+              @resolve.value.should == scenario[:expect] 
+            end
+
+          end 
+        end 
+      end 
+    end
+ 
     describe "and setcode has not been called" do
       it "should return nil" do
         Facter::Util::Resolution.expects(:exec).with(nil, nil).never
@@ -286,13 +462,52 @@ describe Facter::Util::Resolution do
 
   # It's not possible, AFAICT, to mock %x{}, so I can't really test this bit.
   describe "when executing code" do
+    # set up some command strings, making sure we get the right version for both unix and windows
+    echo_command = Facter::Util::Config.is_windows? ? 'cmd.exe /c "echo foo"' : 'echo foo'
+    echo_env_var_command = Facter::Util::Config.is_windows? ? 'cmd.exe /c "echo %%%s%%"' : 'echo $%s'
+
     it "should deprecate the interpreter parameter" do
       Facter.expects(:warnonce).with("The interpreter parameter to 'exec' is deprecated and will be removed in a future version.")
       Facter::Util::Resolution.exec("/something", "/bin/perl")
     end
 
+    # execute a simple echo command
     it "should execute the binary" do
-      Facter::Util::Resolution.exec("echo foo").should == "foo"
+      Facter::Util::Resolution.exec(echo_command).should == "foo"
+    end
+
+    it "should override the LANG environment variable" do
+      Facter::Util::Resolution.exec(echo_env_var_command % 'LANG').should == "C"
+    end
+
+    it "should respect other overridden environment variables" do
+      Facter::Util::Resolution.with_env( {"FOO" => "foo"} ) do
+        Facter::Util::Resolution.exec(echo_env_var_command % 'FOO').should == "foo"
+      end
+    end
+
+    it "should restore overridden LANG environment variable after execution" do
+      # we're going to call with_env in a nested fashion, to make sure that the environment gets restored properly
+      # at each level
+      Facter::Util::Resolution.with_env( {"LANG" => "foo"} ) do
+        # Resolution.exec always overrides 'LANG' for its own execution scope
+        Facter::Util::Resolution.exec(echo_env_var_command % 'LANG').should == "C"
+        # But after 'exec' completes, we should see our value restored
+        ENV['LANG'].should == "foo"
+        # Now we'll do a nested call to with_env
+        Facter::Util::Resolution.with_env( {"LANG" => "bar"} ) do
+          # During 'exec' it should still be 'C'
+          Facter::Util::Resolution.exec(echo_env_var_command % 'LANG').should == "C"
+          # After exec it should be restored to our current value for this level of the nesting...
+          ENV['LANG'].should == "bar"
+        end
+        # Now we've dropped out of one level of nesting,
+        ENV['LANG'].should == "foo"
+        # Call exec one more time just for kicks
+        Facter::Util::Resolution.exec(echo_env_var_command % 'LANG').should == "C"
+        # One last check at our current nesting level.
+        ENV['LANG'].should == "foo"
+      end
     end
   end
 
