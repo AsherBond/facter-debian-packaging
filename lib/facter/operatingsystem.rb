@@ -10,7 +10,6 @@
 #
 # Caveats:
 #
-require 'facter/lsb'
 
 Facter.add(:operatingsystem) do
   confine :kernel => :sunos
@@ -88,6 +87,8 @@ Facter.add(:operatingsystem) do
       "Slackware"
     elsif FileTest.exists?("/etc/alpine-release")
       "Alpine"
+    elsif FileTest.exists?("/etc/mageia-release")
+      "Mageia"
     elsif FileTest.exists?("/etc/system-release")
       "Amazon"
     end

@@ -21,24 +21,6 @@ describe Facter::Util::Loader do
     Facter::Util::Loader.any_instance.unstub(:load_all)
   end
 
-  def with_env(values)
-    old = {}
-    values.each do |var, value|
-      if old_val = ENV[var]
-        old[var] = old_val
-      end
-      ENV[var] = value
-    end
-    yield
-    values.each do |var, value|
-      if old.include?(var)
-        ENV[var] = old[var]
-      else
-        ENV.delete(var)
-      end
-    end
-  end
-
   it "should have a method for loading individual facts by name" do
     Facter::Util::Loader.new.should respond_to(:load)
   end
@@ -51,6 +33,67 @@ describe Facter::Util::Loader do
     Facter::Util::Loader.new.should respond_to(:search_path)
   end
 
+  describe "#valid_seach_path?" do
+    before do
+      @loader = Facter::Util::Loader.new
+      @settings = mock 'settings'
+      @settings.stubs(:value).returns "/eh"
+    end
+    
+    it "should cache the result of a previous check" do
+      Pathname.any_instance.expects(:absolute?).returns(true).once
+      
+      # we explicitly want two calls here to check that we get
+      # the second from the cache
+      @loader.should be_valid_search_path "/foo"
+      @loader.should be_valid_search_path "/foo"
+    end
+    
+    # Used to have test for " " as a directory since that should 
+    # be a relative directory, but on Windows in both 1.8.7 and
+    # 1.9.3 it is an absolute directory (WTF Windows). Considering
+    # we didn't have a valid use case for a " " directory, the 
+    # test was removed. 
+
+    [
+      '.',
+      '..',
+      '...',
+      '.foo',
+      '../foo',
+      'foo',
+      'foo/bar',
+      'foo/../bar',
+      ' /',
+      ' \/',
+    ].each do |dir|
+      
+      it "should be false for relative path #{dir}" do
+        @loader.should_not be_valid_search_path dir
+      end
+      
+    end
+    
+    [
+      '/.',
+      '/..',
+      '/...',
+      '/.foo',
+      '/../foo',
+      '/foo',
+      '/foo/bar',
+      '/foo/../bar',
+      '/ ',
+      '/ /..',
+    ].each do |dir|
+      
+      it "should be true for absolute path #{dir}" do
+        @loader.should be_valid_search_path dir
+      end
+      
+    end
+  end
+
   describe "when determining the search path" do
     before do
       @loader = Facter::Util::Loader.new
@@ -60,10 +103,30 @@ describe Facter::Util::Loader do
 
     it "should include the facter subdirectory of all paths in ruby LOAD_PATH" do
       dirs = $LOAD_PATH.collect { |d| File.join(d, "facter") }
+      @loader.stubs(:valid_search_path?).returns(true)
       paths = @loader.search_path
 
       dirs.each do |dir|
         paths.should be_include(dir)
+      end
+    end
+
+    it "should warn the user when an invalid search path has been excluded" do 
+      dirs = $LOAD_PATH.collect { |d| File.join(d, "facter") }
+      @loader.stubs(:valid_search_path?).returns(false)
+      dirs.each do |dir|
+        Facter.expects(:debugonce).with("Relative directory #{dir} removed from search path.").once
+      end 
+      paths = @loader.search_path
+    end 
+
+
+    it "should exclude invalid search paths" do
+      dirs = $LOAD_PATH.collect { |d| File.join(d, "facter") }
+      @loader.stubs(:valid_search_path?).returns(false)
+      paths = @loader.search_path
+      dirs.each do |dir|
+        paths.should_not be_include(dir)
       end
     end
 
@@ -76,7 +139,7 @@ describe Facter::Util::Loader do
 
     describe "and the FACTERLIB environment variable is set" do
       it "should include all paths in FACTERLIB" do
-        with_env "FACTERLIB" => "/one/path:/two/path" do
+        Facter::Util::Resolution.with_env "FACTERLIB" => "/one/path#{File::PATH_SEPARATOR}/two/path" do
           paths = @loader.search_path
           %w{/one/path /two/path}.each do |dir|
             paths.should be_include(dir)
@@ -95,7 +158,7 @@ describe Facter::Util::Loader do
     it "should load values from the matching environment variable if one is present" do
       Facter.expects(:add).with("testing")
 
-      with_env "facter_testing" => "yayness" do
+      Facter::Util::Resolution.with_env "facter_testing" => "yayness" do
         @loader.load(:testing)
       end
     end
@@ -267,7 +330,7 @@ describe Facter::Util::Loader do
       Facter.expects(:add).with('one')
       Facter.expects(:add).with('two')
 
-      with_env "facter_one" => "yayness", "facter_two" => "boo" do
+      Facter::Util::Resolution.with_env "facter_one" => "yayness", "facter_two" => "boo" do
         @loader.load_all
       end
     end
@@ -281,7 +344,7 @@ describe Facter::Util::Loader do
 
   it "should load facts on the facter search path only once" do
     facterlibdir = File.expand_path(File.dirname(__FILE__) + '../../../fixtures/unit/util/loader')
-    with_env 'FACTERLIB' => facterlibdir do
+    Facter::Util::Resolution.with_env 'FACTERLIB' => facterlibdir do
       Facter::Util::Loader.new.load_all
       Facter.value(:nosuchfact).should be_nil
     end
