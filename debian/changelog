@@ -1,3 +1,9 @@
+facter (2.0.0-0.1rc3puppetlabs1) hardy lucid maverick natty oneiric unstable lenny sid wheezy lucid squeeze precise; urgency=low
+
+  * Imported upstream 2.0.0rc3. 
+
+ -- Moses Mendoza <moses@puppetlabs.com>  Tue, 22 May 2012 11:48:25 +0000
+
 facter (2.0.0-0.1rc2puppetlabs1) hardy lucid maverick natty oneiric unstable lenny sid wheezy lucid squeeze precise; urgency=low
 
   * Imported upstream 2.0.0rc2. 
